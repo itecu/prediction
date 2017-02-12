@@ -1,0 +1,115 @@
+---
+title: "Exercise Category Prediction"
+author: "Ion Tecu"
+date: "12 February 2017"
+output: html_document
+---
+
+## Introduction
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, I will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set.
+
+## Data Loading and Preprocessing
+
+First let's load the caret library. When the models were trained also other libraries where loaded
+
+```{r, message= FALSE}
+library(caret)
+```
+
+And now we load the training data. We set the NA values for the cells with an empty string or one that is equal to "NA".We than create a new dataframe where we remove the columns with more than 50% of NA. We also remove the columns X,
+raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window and new_window which are clearly of no interest for a predictive perspective. We could also remove user_name but we will see that the models don't use that variable to make prediction anyway. So after we start with 160 variables we now have 54 to make prediction with.
+
+```{r}
+df<-read.csv("pml-training.csv",na.strings = c("","NA"))
+dfs<-df[colSums(!is.na(df))/nrow(df)>0.5]
+dfs<-dfs[,c(2,8:60)]
+dim(df)
+dim(dfs)
+```
+
+## Trainig and Test sets creation
+
+Now we need to split the training data into a training set and a test set
+
+```{r}
+inTrain<-createDataPartition(y=dfs$classe,p=0.7,list=FALSE)
+training<-dfs[inTrain,]
+testing<-dfs[-inTrain,]
+```
+
+## Models Creation
+
+Now we will create 5 different models: decision trees, random forests, boosting, linear discriminant analysis, and
+naive bayes. We will calculate the accuracies of these models on the training set in order to see which performs best
+and look at the table of predictions for each case. First let's see the code
+
+```{r, eval = FALSE}
+modFit1<-train(classe~.,method="rpart",data=training)
+acc1<-sum(predict(modFit1,newdata=testing) == testing$classe)/nrow(testing)
+pred1<-predict(modFit1,testing)
+table(pred1,testing$classe)
+modFit2<-train(classe~.,method="rf",data=training,prox=TRUE)
+acc2<-sum(predict(modFit2,newdata=testing) == testing$classe)/nrow(testing)
+pred2<-predict(modFit2,testing)
+table(pred2,testing$classe)
+modFit3<-train(classe~.,method="gbm",data=training,verbose=FALSE)
+acc3<-sum(predict(modFit3,newdata=testing) == testing$classe)/nrow(testing)
+pred3<-predict(modFit3,testing)
+table(pred3,testing$classe)
+modFit4<-train(classe~.,method="lda",data=training)
+acc4<-sum(predict(modFit4,newdata=testing) == testing$classe)/nrow(testing)
+pred4<-predict(modFit4,testing)
+table(pred4,testing$classe)
+modFit5<-train(classe~.,method="nb",data=training)
+acc5<-sum(predict(modFit5,newdata=testing) == testing$classe)/nrow(testing)
+pred5<-predict(modFit5,testing)
+table(pred5,testing$classe)
+```
+
+I didn't run the previous chunk of code because the training the models will take a long time especially for the random forest. So instead i saved the data from my initial run and i load it here. The output is
+
+```{r, echo=FALSE}
+load(file="predictionworkspace.RData")
+acc1
+table(pred1,testing$classe)
+acc2
+table(pred1,testing$classe)
+acc3
+table(pred1,testing$classe)
+acc4
+table(pred1,testing$classe)
+acc5
+table(pred1,testing$classe)
+```
+
+We see now that random forest algorithm performs best with 99.1% accuracy followed by boosting (95.8%), naive bayes (75.6%), linear discriminant analysis (73.6%) and decision trees (49.7%). The out of bag error for random forest is 0.66% which is small. We can consider that the random forest model is the best and consider it's predictions on the final test model.
+
+## Final Test Prediction
+
+First let's load the test set with 20 observations and make predictions using all of our models
+
+```{r, message= FALSE, warning= FALSE}
+finaltesting<-read.csv("pml-testing.csv",na.strings = c("","NA"))
+predict(modFit1,finaltesting)
+sum(predict(modFit1,finaltesting) == predict(modFit2,finaltesting))/20
+predict(modFit2,finaltesting)
+predict(modFit3,finaltesting)
+sum(predict(modFit3,finaltesting) == predict(modFit2,finaltesting))/20
+predict(modFit4,finaltesting)
+sum(predict(modFit4,finaltesting) == predict(modFit2,finaltesting))/20
+predict(modFit5,finaltesting)
+sum(predict(modFit5,finaltesting) == predict(modFit2,finaltesting))/20
+```
+
+We will consider the modelFit2 to be the best predictor and calculate the accuracies of the other predictors compared 
+with it. We see that modFit1 gets 8 right (40% - we expected 50% from decision trees), modFit3 gets all 20 right
+(100% - expected 95%), modFit4 gets 14 (70% - expected 73%) and modFit5 gets 13 (65% - expected 75%). So the results 
+are as we expected so our final predictions are
+
+```{r, message= FALSE, warning= FALSE}
+predict(modFit2,finaltesting)
+```
+
+
